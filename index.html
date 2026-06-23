@@ -3,6 +3,9 @@
 <head>
   <title>Expense App</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
 </head>
 <body>
 
@@ -48,10 +51,12 @@
 </form>
 
 <script>
-const API = "YOUR_WEB_APP_URL";
+const API = "https://script.google.com/macros/s/AKfycbxG4W89kqSgnW-seoDOIQdNz6PSHjyRCoFvxdGZaru9nShabLGwEiH2IEIN4VPdbw1sAw/exec";
+
+const phoneInput = document.getElementById("phone");
 
 // Auto name fetch
-document.getElementById("phone").addEventListener("blur", async () => {
+phoneInput.addEventListener("blur", async () => {
   const phone = phoneInput.value;
   if (!phone) return;
 
@@ -59,8 +64,6 @@ document.getElementById("phone").addEventListener("blur", async () => {
   const name = await res.text();
   if (name) document.getElementById("name").value = name;
 });
-
-const phoneInput = document.getElementById("phone");
 
 document.getElementById("form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -74,7 +77,7 @@ document.getElementById("form").addEventListener("submit", async (e) => {
     reason: reason.value
   };
 
-  // Save offline
+  // Offline save
   if (!navigator.onLine) {
     let offline = JSON.parse(localStorage.getItem("offline") || "[]");
     offline.push(data);
@@ -117,6 +120,11 @@ window.addEventListener("online", async () => {
   }
   localStorage.removeItem("offline");
 });
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
 </script>
 
 </body>
