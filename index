@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Expense App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<h2>Expense Form</h2>
+
+<form id="form">
+  <select id="category" required>
+    <option value="">Select Category</option>
+    <option>Giving Loan</option>
+    <option>Taking Loan</option>
+    <option>Loan Paid</option>
+    <option>Credit Purchase</option>
+    <option>Credit Purchase Loan Paid</option>
+    <option>Loan Repaid</option>
+    <option>Food</option>
+    <option>Other</option>
+  </select>
+
+  <br><br>
+
+  <input type="text" id="phone" placeholder="Phone Number">
+  <br><br>
+
+  <input type="text" id="name" placeholder="Name">
+  <br><br>
+
+  <input type="number" id="take" placeholder="Take Amount">
+  <br><br>
+
+  <input type="number" id="give" placeholder="Give Amount">
+  <br><br>
+
+  <input type="text" id="reason" placeholder="Reason">
+  <br><br>
+
+  <label>
+    <input type="checkbox" id="sms"> Send SMS
+  </label>
+
+  <br><br>
+
+  <button type="submit">Submit</button>
+</form>
+
+<script>
+const API = "YOUR_WEB_APP_URL";
+
+// Auto name fetch
+document.getElementById("phone").addEventListener("blur", async () => {
+  const phone = phoneInput.value;
+  if (!phone) return;
+
+  const res = await fetch(API + "?phone=" + phone);
+  const name = await res.text();
+  if (name) document.getElementById("name").value = name;
+});
+
+const phoneInput = document.getElementById("phone");
+
+document.getElementById("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const data = {
+    category: category.value,
+    name: name.value,
+    phone: phone.value,
+    take: take.value,
+    give: give.value,
+    reason: reason.value
+  };
+
+  // Save offline
+  if (!navigator.onLine) {
+    let offline = JSON.parse(localStorage.getItem("offline") || "[]");
+    offline.push(data);
+    localStorage.setItem("offline", JSON.stringify(offline));
+    alert("Saved offline");
+    return;
+  }
+
+  await fetch(API, {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+
+  // SMS
+  if (sms.checked && phone.value) {
+    let msg = "";
+
+    if (data.category === "Giving Loan") {
+      msg = `আপনি ${data.name} এর কাছ থেকে ${data.give} টাকা লোন পেয়েছেন`;
+    }
+
+    if (data.category === "Loan Paid") {
+      msg = `${data.give} টাকা পরিশোধ করা হয়েছে`;
+    }
+
+    window.location.href = `sms:${data.phone}?body=${encodeURIComponent(msg)}`;
+  }
+
+  alert("Saved!");
+});
+
+// Sync offline
+window.addEventListener("online", async () => {
+  let offline = JSON.parse(localStorage.getItem("offline") || "[]");
+  for (let item of offline) {
+    await fetch(API, {
+      method: "POST",
+      body: JSON.stringify(item)
+    });
+  }
+  localStorage.removeItem("offline");
+});
+</script>
+
+</body>
+</html>
