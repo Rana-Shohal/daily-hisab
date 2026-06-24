@@ -448,13 +448,15 @@ async function fsGet(col, id) {
 let IDB;
 function openIDB() {
   return new Promise((res,rej) => {
-    const r=indexedDB.open('HisabV5',1);
+    const r=indexedDB.open('HisabV5',2);
     r.onupgradeneeded=e=>{
       const db=e.target.result;
-      ['expenses','pending','network'].forEach(s=>{
+      ['expenses','pending'].forEach(s=>{
         if(!db.objectStoreNames.contains(s))
           db.createObjectStore(s,{keyPath:'lid',autoIncrement:true});
       });
+      if(!db.objectStoreNames.contains('network'))
+        db.createObjectStore('network',{keyPath:'phone'});
     };
     r.onsuccess=e=>{IDB=e.target.result;res();};
     r.onerror=()=>rej();
@@ -462,7 +464,12 @@ function openIDB() {
 }
 const tx=(s,m)=>IDB.transaction(s,m).objectStore(s);
 const iAll=s=>new Promise(r=>{const q=tx(s,'readonly').getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>r([]);});
-const iAdd=(s,d)=>new Promise((r,j)=>{const q=tx(s,'readwrite').add(d);q.onsuccess=()=>r(q.result);q.onerror=()=>j();});
+const iAdd=(s,d)=>new Promise((r,j)=>{
+  const clean={...d};delete clean.lid;delete clean.fbId;
+  const q=tx(s,'readwrite').add(clean);
+  q.onsuccess=()=>r(q.result);
+  q.onerror=e=>{console.warn('iAdd error',e);j(e);}
+});
 const iPut=(s,d)=>new Promise(r=>{tx(s,'readwrite').put(d);r();});
 const iDel=(s,k)=>new Promise(r=>{tx(s,'readwrite').delete(k);r();});
 const iClr=s=>new Promise(r=>{tx(s,'readwrite').clear();r();});
@@ -590,15 +597,19 @@ async function loadData() {
     // Replace local with Firebase data
     await iClr('expenses');
     for(const r of remote) {
-      const d={...r,lid:undefined};delete d.lid;
-      await iAdd('expenses',d);
+      try { await iAdd('expenses', r); } catch(e){ console.warn('skip',e); }
     }
-    DATA=remote.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    DATA=remote.sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
     renderAll();
     // Load network
     const net=await fsAll(uCol('network'));
     await iClr('network');
-    for(const n of net){if(n.phone){NET[n.phone]=n.name;await iAdd('network',{lid:undefined,...n});}}
+    for(const n of net){
+      if(n.phone){
+        NET[n.phone]=n.name;
+        try{ await iPut('network',{phone:n.phone,name:n.name||''}); }catch(e){}
+      }
+    }
   } catch(e){ console.warn(e); toast('⚠️ '+e.message,'er'); }
 }
 
@@ -709,24 +720,24 @@ document.getElementById('saveBtn').onclick=async function(){
     takeAmount:take,giveAmount:give,reason:reason||''
   };
 
-  // Save local
-  const lid=await iAdd('expenses',{...entry});
-  DATA.unshift({...entry,lid});
+  // Save local first
+  const lid=await iAdd('expenses', entry);
+  DATA.unshift({...entry, lid});
   document.getElementById('totCnt').textContent=DATA.length+' টি';
 
   if(navigator.onLine){
     try{
       await doRefresh();
-      const fbId=await fsAdd(uCol('expenses'),entry);
+      const fbId=await fsAdd(uCol('expenses'), entry);
       if(phone&&name) await fsSet(uCol('network'),phone,{name,phone});
-      NET[phone]=name;
+      if(phone) NET[phone]=name;
       toast('✅ Firebase এ সেভ হয়েছে!','ok');
     }catch(e){
-      await iAdd('pending',{...entry,lid});
+      await iAdd('pending', entry);
       toast('📴 অফলাইনে সেভ, পরে সিঙ্ক হবে','in');
     }
   } else {
-    await iAdd('pending',{...entry,lid});
+    await iAdd('pending', entry);
     toast('📴 অফলাইনে সেভ হয়েছে','in');
   }
 
