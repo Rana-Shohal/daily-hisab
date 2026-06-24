@@ -595,7 +595,6 @@ async function loadData() {
     }
     DATA=remote.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     renderAll();
-    document.getElementById('totCnt').textContent=DATA.length+' টি';
     // Load network
     const net=await fsAll(uCol('network'));
     await iClr('network');
@@ -607,6 +606,7 @@ function renderAll() {
   renderHistory();
   renderSummary();
   if(CUR_L) renderLoan(CUR_L);
+  document.getElementById('totCnt').textContent = DATA.length + ' টি';
 }
 
 // ══════════════════════════════
@@ -699,13 +699,14 @@ document.getElementById('saveBtn').onclick=async function(){
   this.innerHTML='<span class="spin"></span>সেভ হচ্ছে...';this.disabled=true;
 
   const now=new Date();
+  const mKey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const entry={
     dateTime:now.toLocaleString('bn-BD',{timeZone:'Asia/Dhaka'}),
     dateTimeISO:now.toISOString(),
-    monthKey:now.toISOString().slice(0,7),
+    monthKey:mKey,
     createdAt:now.getTime(),
-    category:cat,name,phone,
-    takeAmount:take,giveAmount:give,reason
+    category:cat,name:name||'',phone:phone||'',
+    takeAmount:take,giveAmount:give,reason:reason||''
   };
 
   // Save local
@@ -804,12 +805,19 @@ function buildMonths(){
     s.appendChild(o);
   }
 }
+function getMonthKey(e){
+  if(e.monthKey && e.monthKey.length===7) return e.monthKey;
+  if(e.dateTimeISO) return e.dateTimeISO.slice(0,7);
+  if(e.createdAt){
+    const d=new Date(Number(e.createdAt));
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  }
+  return '';
+}
 function renderSummary(){
   const m=document.getElementById('mSel').value;
-  const rows=DATA.filter(e=>{
-    const mk=e.monthKey||(e.dateTimeISO?e.dateTimeISO.slice(0,7):'');
-    return mk===m;
-  });
+  if(!m) return;
+  const rows=DATA.filter(e=>getMonthKey(e)===m);
   let inc=0,exp=0,pay=0;const cats={};
   for(const e of rows){
     const c=e.category,tk=Number(e.takeAmount)||0,gv=Number(e.giveAmount)||0;
@@ -891,7 +899,7 @@ document.querySelectorAll('.tab').forEach(t=>t.onclick=function(){
   this.classList.add('act');
   document.getElementById('page-'+this.dataset.p).classList.add('act');
   const p=this.dataset.p;
-  if(p==='summary')renderSummary();
+  if(p==='summary'){buildMonths();renderSummary();}
   if(p==='history')renderHistory();
   if(p==='loan'&&CUR_L)renderLoan(CUR_L);
 });
